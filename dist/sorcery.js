@@ -5,24 +5,6 @@ var path = require('path');
 var crc32 = require('buffer-crc32');
 crc32 = 'default' in crc32 ? crc32['default'] : crc32;
 
-var SOURCEMAPPING_URL = 'sourceMa';
-SOURCEMAPPING_URL += 'ppingURL';
-
-function sourcemapComment(url, dest) {
-	var ext = path.extname(dest);
-	url = encodeURI(url);
-
-	if (ext === '.css') {
-		return '\n/*# ' + SOURCEMAPPING_URL + '=' + url + ' */\n';
-	}
-
-	return '\n//# ' + SOURCEMAPPING_URL + '=' + url + '\n';
-}
-
-var SOURCEMAP_COMMENT = new RegExp('\n*(?:' + ('\\/\\/[@#]\\s*' + SOURCEMAPPING_URL + '=([^\'"]+)|') + ( // js
-'\\/\\*#?\\s*' + SOURCEMAPPING_URL + '=([^\'"]+)\\s\\*\\/)') + // css
-'\\s*$', 'g');
-
 function processWriteOptions(dest, chain, options) {
 	var resolved = path.resolve(dest);
 
@@ -33,8 +15,8 @@ function processWriteOptions(dest, chain, options) {
 
 	var url = options.inline ? map.toUrl() : (options.absolutePath ? resolved : path.basename(resolved)) + '.map';
 
-	// TODO shouldn't url be relative?
-	var content = chain.node.content.replace(SOURCEMAP_COMMENT, '') + sourcemapComment(url, resolved);
+	// No need to append source map comment; we are overwriting original source map using sorcery
+	var content = chain.node.content;
 
 	return { resolved: resolved, content: content, map: map };
 }
@@ -206,7 +188,7 @@ var Chain = (function () {
 	Chain.prototype.apply = function apply() {
 		var _this = this;
 
-		var options = arguments[0] === undefined ? {} : arguments[0];
+		var options = arguments.length <= 0 || arguments[0] === undefined ? {} : arguments[0];
 
 		var allNames = [];
 		var allSources = [];
@@ -279,7 +261,7 @@ var Chain = (function () {
 		return new SourceMap({
 			file: path.basename(this.node.file),
 			sources: allSources.map(function (source) {
-				return source.indexOf('://') >= 0 ? source : slash(path.relative(options.base || path.dirname(_this.node.file), source));
+				return source.indexOf("://") >= 0 ? source : slash(path.relative(options.base || path.dirname(_this.node.file), source));
 			}),
 			sourcesContent: allSources.map(function (source) {
 				return includeContent ? _this.sourcesContentByPath[source] : null;
@@ -341,7 +323,14 @@ var Chain = (function () {
 })();
 
 function resolveSourcePath(node, sourceRoot, source) {
-	return source.indexOf('://') >= 0 ? source : path.resolve(path.dirname(node.file), sourceRoot || '', source);
+	// Webpack generates weird URLs and we can just replace these with node_modules or the current directory
+	if (source.startsWith('webpack:///./~/')) {
+		source = source.replace('webpack:///./~/', '../../node_modules/');
+	}
+	if (source.startsWith('webpack:///./')) {
+		source = source.replace('webpack:///./', '');
+	}
+	return source.indexOf("://") >= 0 ? source : path.resolve(path.dirname(node.file), sourceRoot || '', source);
 }
 
 var cache = {};
@@ -567,7 +556,7 @@ var Node = (function () {
 
 		_classCallCheck(this, Node);
 
-		this.file = file ? file.indexOf('://') >= 0 ? file : path.resolve(file) : null;
+		this.file = file ? file.indexOf("://") >= 0 ? file : path.resolve(file) : null;
 		this.content = content || null; // sometimes exists in sourcesContent, sometimes doesn't
 
 		if (!this.file && this.content === null) {
@@ -749,7 +738,7 @@ function load(file, options) {
 }
 
 function loadSync(file) {
-	var options = arguments[1] === undefined ? {} : arguments[1];
+	var options = arguments.length <= 1 || arguments[1] === undefined ? {} : arguments[1];
 
 	var _init2 = init(file, options);
 
@@ -762,7 +751,7 @@ function loadSync(file) {
 }
 
 function init(file) {
-	var options = arguments[1] === undefined ? {} : arguments[1];
+	var options = arguments.length <= 1 || arguments[1] === undefined ? {} : arguments[1];
 
 	var node = new Node({ file: file });
 

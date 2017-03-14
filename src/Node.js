@@ -178,5 +178,12 @@ function getContent ( node, sourcesContentByPath ) {
 }
 
 function resolveSourcePath ( node, sourceRoot, source ) {
+	// Webpack generates weird URLs and we can just replace these with node_modules or the current directory
+  if (source.startsWith('webpack:///./~/')) {
+    source = source.replace('webpack:///./~/', '../../node_modules/');
+  }
+  if (source.startsWith('webpack:///./')) {
+    source = source.replace('webpack:///./', '');
+  }
 	return source.indexOf("://") >= 0 ? source :resolve( dirname( node.file ), sourceRoot || '', source );
 }

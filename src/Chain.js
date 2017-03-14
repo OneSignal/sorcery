@@ -164,8 +164,8 @@ function processWriteOptions ( dest, chain, options ) {
 
 	const url = options.inline ? map.toUrl() : ( options.absolutePath ? resolved : basename( resolved ) ) + '.map';
 
-	// TODO shouldn't url be relative?
-	const content = chain.node.content.replace( SOURCEMAP_COMMENT, '' ) + sourcemapComment( url, resolved );
+  // No need to append source map comment; we are overwriting original source map using sorcery
+  const content = chain.node.content;
 
 	return { resolved, content, map };
 }
